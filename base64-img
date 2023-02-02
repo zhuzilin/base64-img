@@ -1,0 +1,70 @@
+#!/opt/homebrew/bin/python3
+import argparse
+import base64
+import io
+import os
+import sys
+from PIL import Image
+
+
+parser = argparse.ArgumentParser(add_help=False)
+parser.add_argument('-w', '--w', type=int)
+parser.add_argument('-h', '--h', type=int)
+parser.add_argument('-r', '--resize', action='store_true')
+parser.add_argument('file', type=str)
+
+
+def exit_with_msg(msg):
+    print(msg, file=sys.stderr)
+    exit(-1)
+
+
+def log(msg):
+    print(msg, file=sys.stderr)
+
+
+if __name__ == '__main__':
+    args = parser.parse_args()
+    
+    if not os.path.exists(args.file):
+        exit_with_msg(f'{args.file} doesn\'t exist')
+    if not hasattr(args, 'w'):
+        args.w = None
+    if not hasattr(args, 'h'):
+        args.h = None
+
+    if args.w and args.w <= 0:
+        exit_with_msg(f'Width could not be {args.w}')
+    if args.w and args.w <= 0:
+        exit_with_msg(f'Width could not be {args.w}')
+
+    ext = args.file.split('.')[-1].lower()
+    if ext not in ['png', 'jpg', 'jpeg']:
+        exit_with_msg(f'.{ext} is not supported at the moment.')
+
+    img = Image.open(args.file)
+
+    # resize    
+    w, h = img.size[0], img.size[1]
+    log(f'{args.file} shape: {w} x {h}')
+    if args.w and args.h:
+        resize_w, resize_h = args.w, args.h
+    elif args.w and not args.h:
+        resize_w, resize_h = args.w, max(int(args.w / w * h), 1)
+    elif not args.w and args.h:
+        resize_w, resize_h = max(int(args.h / h * w), 1), args.h
+    else:
+        resize_w, resize_h = w, h
+
+    if args.resize and not (resize_w == w and resize_h == h):
+        log(f'{args.file} resize shape: {resize_w} x {resize_h}')
+        new_img = img.resize((resize_w, resize_h), Image.Resampling.LANCZOS)
+        new_img.format = img.format
+        img = new_img
+
+    # convert to base64
+    buf = io.BytesIO()
+    img.save(buf, format=img.format)
+    base64_str = base64.b64encode(buf.getvalue()).decode("utf-8")
+    log(f'base64 length: {len(base64_str)}')
+    print(f'<img width={resize_w} height={resize_h} alt="{args.file}" src="data:image/{ext};base64,{base64_str}"/>')
